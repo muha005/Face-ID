@@ -4,41 +4,47 @@ const checkIcon = document.getElementById('check-icon');
 const statusText = document.getElementById('status-text');
 const teacherInfo = document.getElementById('teacher-info');
 const timeBadge = document.getElementById('time-badge');
-const offlineBanner = document.getElementById('offline-banner');
+const hintText = document.getElementById('hint-text');
 
 let currentLang = 'ru';
 let lastRecognizedTeacher = '';
 let lastRecognizedTime = 0;
 let faceMatcher = null;
-let teachers = [];
+let teachers = [];   // Firestore'dan real vaqtda keladi
+let todayLoggedNames = new Set(); // bugun allaqachon belgilangan ismlar (keraksiz yozuvlarni oldini olish uchun)
 let modelsReady = false;
+let matcherBuilding = false;
 
 const i18n = {
   ru: {
     appTitle: "Средняя школа имени Раджаба Ходжамова",
     lookAtCamera: "Пожалуйста, смотрите в камеру",
-    loading: "Загрузка системы...",
     notFound: "Доступ запрещен (Не зарегистрирован)",
     welcome: "Добро пожаловать!",
     lateWarning: "Вы опоздали!",
     subject: "Предмет",
     time: "Время прихода",
-    noCamera: "Нет доступа к камере. Разрешите доступ и обновите страницу.",
-    noTeachers: "Список учителей пуст. Обратитесь к администратору.",
-    offline: "Нет связи с сервером — работает автономно"
+    loading: "Загрузка системы...",
+    camError: "Нет доступа к камере",
+    camErrorHint: "Разрешите доступ к камере в настройках браузера и обновите страницу.",
+    httpsHint: "Если камера не открывается — сайт должен быть открыт по HTTPS-адресу, а не как локальный файл.",
+    noTeachers: "Нет зарегистрированных учителей",
+    connError: "Ошибка соединения с базой"
   },
   kg: {
     appTitle: "Ражаб Хожамов атындагы орто мектеби",
     lookAtCamera: "Сураныч, камераны караңыз",
-    loading: "Тутум жүктөлүүдө...",
     notFound: "Катталган эмес (Кирүүгө болбойт)",
     welcome: "Кош келиңиз!",
     lateWarning: "Сиз кечиктиңиз!",
     subject: "Сабагы",
     time: "Келген убактысы",
-    noCamera: "Камерага уруксат жок. Уруксат берип, баракты жаңыртыңыз.",
-    noTeachers: "Мугалимдер тизмеси бош. Администраторго кайрылыңыз.",
-    offline: "Сервер менен байланыш жок — оффлайн иштеп жатат"
+    loading: "Тутум жүктөлүүдө...",
+    camError: "Камерага мүмкүнчүлүк жок",
+    camErrorHint: "Браузер орнотууларынан камерага уруксат бериңиз жана баракты жаңыртыңыз.",
+    httpsHint: "Эгер камера ачылбаса — сайт локалдык файл эмес, HTTPS дареги менен ачылышы керек.",
+    noTeachers: "Каттоодон өткөн мугалим жок",
+    connError: "Базага туташуу катасы"
   }
 };
 
@@ -49,21 +55,32 @@ function playTringSound() {
     const gain1 = audioCtx.createGain();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-    osc1.connect(gain1); gain1.connect(audioCtx.destination);
-    osc1.start(); osc1.stop(audioCtx.currentTime + 0.12);
+    osc1.connect(gain1);
+    gain1.connect(audioCtx.destination);
+    osc1.start();
+    osc1.stop(audioCtx.currentTime + 0.12);
+
     setTimeout(() => {
       const osc2 = audioCtx.createOscillator();
       const gain2 = audioCtx.createGain();
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(880, audioCtx.currentTime);
-      osc2.connect(gain2); gain2.connect(audioCtx.destination);
-      osc2.start(); osc2.stop(audioCtx.currentTime + 0.25);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start();
+      osc2.stop(audioCtx.currentTime + 0.25);
     }, 100);
-  } catch (e) { /* audio not critical */ }
+  } catch (e) {
+    console.log("Audio error:", e);
+  }
 }
 
-// Tez va yengil model: tinyFaceDetector (mobil qurilmalarda ham 1 soniyagacha)
-const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights/';
+// Tezroq va yengil model: tinyFaceDetector (ssdMobilenetv1 o'rniga — bir necha soniya emas, taxminan yarim soniyada aniqlaydi)
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+const DETECT_OPTIONS = new Promise(resolve => {
+  // faceapi yuklangandan keyin chaqiriladi, pastda o'rnatiladi
+  resolve(null);
+});
 
 Promise.all([
   faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -72,149 +89,141 @@ Promise.all([
 ]).then(() => {
   modelsReady = true;
   startVideo();
-  listenTeachers();
+  listenToTeachers();
 }).catch(err => {
   console.error("Model yuklashda xato:", err);
-  statusText.innerText = "Хатолик: тизим юкланмади. Интернетни текширинг.";
+  showFatalError(i18n[currentLang].connError, "Face-api моделлари юкланмади. Интернетни текширинг.");
 });
+
+function getTinyOptions() {
+  return new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+}
 
 function startVideo() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    statusText.innerText = i18n[currentLang].noCamera;
+    showFatalError(i18n[currentLang].camError, i18n[currentLang].httpsHint);
     return;
   }
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-    audio: false
-  }).then(stream => {
-    video.srcObject = stream;
-    // iOS Safari uchun majburiy: aks holda kamera to'liq ekranga chiqib
-    // ketishi yoki ishlamay qolishi mumkin.
-    video.setAttribute('playsinline', true);
-    video.setAttribute('webkit-playsinline', true);
-    statusText.innerText = i18n[currentLang].lookAtCamera;
-  }).catch(err => {
-    console.error("Camera error:", err);
-    statusText.innerText = i18n[currentLang].noCamera;
-  });
+  navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } })
+    .then(stream => {
+      video.srcObject = stream;
+      statusText.innerText = i18n[currentLang].lookAtCamera;
+      hintText.innerText = '';
+    })
+    .catch(err => {
+      console.error("Camera error:", err);
+      showFatalError(i18n[currentLang].camError, i18n[currentLang].camErrorHint + ' ' + i18n[currentLang].httpsHint);
+    });
 }
 
-// O'qituvchilar ro'yxatini serverdan REAL VAQTDA tinglaydi — boshqa
-// qurilmadan (masalan admin planshetdan) qo'shilgan o'qituvchi shu zahoti
-// shu ekranda ham tanila boshlaydi, sahifani yangilash shart emas.
-function listenTeachers() {
-  if (!firebaseReady) { statusText.innerText = i18n[currentLang].offline; return; }
-  db.collection(TEACHERS_COLLECTION).onSnapshot(async (snapshot) => {
+function showFatalError(title, hint) {
+  resultCard.className = "result-card error";
+  checkIcon.style.display = "none";
+  statusText.innerText = title;
+  teacherInfo.innerText = '';
+  timeBadge.style.display = "none";
+  hintText.innerText = hint || '';
+}
+
+// O'qituvchilar ro'yxatini Firestore'dan REAL VAQTDA tinglaydi.
+// Boshqa qurilmada (masalan admin panelda) yangi o'qituvchi qo'shilsa — bu yerda sahifani yangilamasdan avtomatik yangilanadi.
+function listenToTeachers() {
+  db.collection('teachers').onSnapshot(snapshot => {
     teachers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    localStorage.setItem('teachers_cache', JSON.stringify(teachers));
-    await updateFaceMatcher();
-    if (offlineBanner) offlineBanner.style.display = 'none';
-  }, (err) => {
-    console.error("Firestore sync error:", err);
-    if (offlineBanner) offlineBanner.style.display = 'block';
-    // Internet uzilib qolsa - oxirgi saqlangan ro'yxat bilan davom etadi
-    const cached = JSON.parse(localStorage.getItem('teachers_cache') || '[]');
-    if (cached.length && teachers.length === 0) {
-      teachers = cached;
-      updateFaceMatcher();
-    }
+    rebuildFaceMatcher();
+  }, err => {
+    console.error("Firestore xatosi:", err);
+    showFatalError(i18n[currentLang].connError, 'Firestore қоидаларини текширинг (Firebase консол → Firestore → Rules).');
+  });
+
+  // Bugun allaqachon belgilanganlarni bilib turish uchun (takroriy yozuvni oldini olish, o'qishlarni kamaytirish)
+  const today = getLocalDateStr();
+  db.collection('attendance_logs').where('date', '==', today).onSnapshot(snapshot => {
+    todayLoggedNames = new Set(snapshot.docs.map(d => d.data().name));
   });
 }
 
-async function updateFaceMatcher() {
-  if (!modelsReady) return;
+async function rebuildFaceMatcher() {
+  if (!modelsReady || matcherBuilding) return;
+  matcherBuilding = true;
+
   if (teachers.length === 0) {
     faceMatcher = null;
-    if (statusText.innerText === i18n[currentLang].lookAtCamera) {
-      teacherInfo.innerText = i18n[currentLang].noTeachers;
-    }
+    matcherBuilding = false;
     return;
   }
 
   const labeledDescriptors = [];
   for (const teacher of teachers) {
-    // Yangi format: photos = [base64, base64, ...] (bir necha rasm — turli
-    // kun/kiyim/yorug'lik sharoitida ham tanish aniqligini oshiradi).
-    // Eski format bilan orqaga moslik: teacher.photo (bitta rasm) ham qo'llab-quvvatlanadi.
-    const photoList = Array.isArray(teacher.photos) && teacher.photos.length
-      ? teacher.photos
-      : (teacher.photo ? [teacher.photo] : []);
-    if (!photoList.length) continue;
-
-    const descriptors = [];
-    for (const photoBase64 of photoList) {
-      try {
-        const img = await faceapi.fetchImage(photoBase64);
-        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (detection) descriptors.push(detection.descriptor);
-      } catch (e) {
-        console.error("Rasmni o'qishda xato:", teacher.fullname, e);
+    if (!teacher.photo) continue;
+    try {
+      const img = await faceapi.fetchImage(teacher.photo);
+      const detection = await faceapi.detectSingleFace(img, getTinyOptions()).withFaceLandmarks().withFaceDescriptor();
+      if (detection) {
+        labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(teacher.fullname, [detection.descriptor]));
       }
-    }
-    if (descriptors.length) {
-      labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(teacher.fullname, descriptors));
+    } catch (e) {
+      console.error("Дескриптор ҳисоблашда хато (" + teacher.fullname + "):", e);
     }
   }
 
-  // distanceThreshold biroz kengroq (0.5) — bir necha rasm bo'lgani uchun
-  // kiyim/soch/yorug'lik farqiga chidamliroq, lekin begonani xato tanimaydi.
-  faceMatcher = labeledDescriptors.length ? new faceapi.FaceMatcher(labeledDescriptors, 0.5) : null;
+  faceMatcher = labeledDescriptors.length > 0 ? new faceapi.FaceMatcher(labeledDescriptors, 0.45) : null;
+  matcherBuilding = false;
 }
 
 video.addEventListener('play', () => {
-  const container = document.querySelector('.camera-container');
   const canvas = faceapi.createCanvasFromMedia(video);
-  container.append(canvas);
-  const displaySize = { width: video.clientWidth || 640, height: video.clientHeight || 480 };
+  document.querySelector('.camera-container').append(canvas);
+  const displaySize = { width: video.videoWidth || 640, height: video.videoHeight || 480 };
   faceapi.matchDimensions(canvas, displaySize);
 
-  const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-
-  // Tez skanerlash: 200ms — tinyFaceDetector yengil bo'lgani uchun
-  // telefon/planshetda ham 1 soniyagacha tanib ulguradi.
+  // Tez skanerlash: yengil model bo'lgani uchun 300ms'da ham muammosiz ishlaydi
   setInterval(async () => {
     if (!modelsReady) return;
 
-    const detection = await faceapi.detectSingleFace(video, detectorOptions)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!canvas.width || canvas.width !== (video.clientWidth || 640)) {
-      faceapi.matchDimensions(canvas, { width: video.clientWidth || 640, height: video.clientHeight || 480 });
+    if (!faceMatcher) {
+      if (teachers.length === 0) {
+        resultCard.className = "result-card";
+        statusText.innerText = i18n[currentLang].noTeachers;
+        teacherInfo.innerText = '';
+      }
+      return;
     }
+
+    const detections = await faceapi.detectAllFaces(video, getTinyOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    const resizedDetections = faceapi.resizeResults(detections, displaySize);
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 
-    if (!detection) { resetCard(); return; }
+    if (resizedDetections.length > 0) {
+      const bestMatch = faceMatcher.findBestMatch(resizedDetections[0].descriptor);
 
-    if (!faceMatcher) { showUnknown(); return; }
-
-    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-
-    if (bestMatch.label !== 'unknown') {
-      const now = Date.now();
-      if (lastRecognizedTeacher !== bestMatch.label || (now - lastRecognizedTime > 4000)) {
-        lastRecognizedTeacher = bestMatch.label;
-        lastRecognizedTime = now;
-        onFaceRecognized(bestMatch.label);
+      if (bestMatch.label !== 'unknown') {
+        const now = Date.now();
+        if (lastRecognizedTeacher !== bestMatch.label || (now - lastRecognizedTime > 4000)) {
+          lastRecognizedTeacher = bestMatch.label;
+          lastRecognizedTime = now;
+          onFaceRecognized(bestMatch.label);
+        }
+      } else {
+        showUnknown();
       }
     } else {
-      showUnknown();
+      resetCard();
     }
-  }, 200);
+  }, 300);
 });
 
 function onFaceRecognized(teacherName) {
   const teacher = teachers.find(t => t.fullname === teacherName) || { subject: "Учитель" };
 
   const now = new Date();
+  const currentTimeStr = getLocalTimeStr(now);
   const hours = now.getHours();
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const hoursStr = String(hours).padStart(2, '0');
-  const currentTimeStr = `${hoursStr}:${minutes}`;
-
-  const isLate = hours > 8 || (hours === 8 && now.getMinutes() > 0);
+  const minutes = now.getMinutes();
+  const isLate = hours > 8 || (hours === 8 && minutes > 0);
 
   playTringSound();
   checkIcon.innerText = "✅";
@@ -227,7 +236,7 @@ function onFaceRecognized(teacherName) {
   timeBadge.style.display = "inline-block";
   timeBadge.innerText = `${i18n[currentLang].time}: ${currentTimeStr}`;
 
-  saveAttendance(teacherName, currentTimeStr, isLate);
+  saveAttendance(teacherName, currentTimeStr, isLate, now);
 }
 
 function showUnknown() {
@@ -247,28 +256,24 @@ function resetCard() {
   timeBadge.style.display = "none";
 }
 
-// Davomatni umumiy bazaga (barcha qurilmalar ko'radi) va zaxira sifatida
-// localStorage'ga ham yozadi (internet uzilib qolsa yo'qolmasligi uchun).
-function saveAttendance(name, time, isLate) {
-  // YYYY-MM-DD ni LOKAL vaqt bo'yicha hisoblaymiz (UTC emas!) — aks holda
-  // tungi soatlarda sana bir kun oldinga/orqaga siljib ketishi mumkin edi.
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+// Davomatni Firestore'ga yozadi — barcha qurilmalarda darhol ko'rinadi.
+// Bir kunda bir marta yoziladi (mahalliy keshdan tekshiriladi, keraksiz yozuvni oldini oladi).
+function saveAttendance(name, time, isLate, dateObj) {
+  const today = getLocalDateStr(dateObj);
+  if (todayLoggedNames.has(name)) return;
+  todayLoggedNames.add(name); // darhol belgilab qo'yamiz — tez-tez bosilsa ham qayta yozilmasin
 
-  const localLogs = JSON.parse(localStorage.getItem('attendance_logs') || '[]');
-  const alreadyToday = localLogs.some(log => log.name === name && log.date === today);
-  if (alreadyToday) return;
-
-  const entry = { name, date: today, time, isLate };
-  localLogs.push(entry);
-  localStorage.setItem('attendance_logs', JSON.stringify(localLogs));
-
-  if (firebaseReady) {
-    db.collection(LOGS_COLLECTION).add({
-      ...entry,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(err => console.error("Davomatni saqlashda xato:", err));
-  }
+  db.collection('attendance_logs').add({
+    name,
+    date: today,
+    time,
+    isLate,
+    ts: dateObj.getTime(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err => {
+    console.error("Давоматни сақлашда хато:", err);
+    todayLoggedNames.delete(name); // xato bo'lsa qayta urinish imkoni bo'lsin
+  });
 }
 
 function switchLang(lang) {
