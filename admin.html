@@ -2,69 +2,91 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Панель директора - Rajab Xo'jamov maktabi</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #f1f5f9; color: #0f172a; padding: 20px; }
-    
-    /* LOGIN MODAL */
-    .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-    .login-box { background: white; padding: 30px; border-radius: 12px; width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; }
-    .login-box h2 { margin-bottom: 20px; color: #0284c7; }
-    .login-box input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
-    .login-box button { width: 100%; padding: 10px; background: #0284c7; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    html, body { height: 100%; }
+    body { background-color: #f1f5f9; color: #0f172a; padding: 14px; }
 
-    /* ADMIN MAIN CONTENT */
-    .admin-container { display: none; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    
-    .grid-container { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
-    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .card h2 { font-size: 1.1rem; margin-bottom: 15px; color: #0284c7; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
+    .login-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 16px; }
+    .login-box { background: white; padding: 28px 24px; border-radius: 12px; width: 100%; max-width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; }
+    .login-box h2 { margin-bottom: 20px; color: #0284c7; }
+    .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-size: 1rem; }
+    .login-box button { width: 100%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+
+    .admin-container { display: none; max-width: 1200px; margin: 0 auto; }
+    header { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 16px; background: #fff; padding: 14px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    header h1 { font-size: clamp(0.95rem, 3vw, 1.25rem); }
+
+    #sync-status { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #dcfce7; color: #166534; }
+    #sync-status.offline { background: #fee2e2; color: #991b1b; }
+
+    .grid-container { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 18px; }
+    @media (max-width: 900px) {
+      .grid-container { grid-template-columns: 1fr; }
+    }
+
+    .card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 18px; overflow: hidden; }
+    .card h2 { font-size: 1.05rem; margin-bottom: 14px; color: #0284c7; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
 
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; }
-    .form-group input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+    .form-group input[type="text"] { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-size: 1rem; }
+    .form-group input[type="file"] { width: 100%; padding: 8px 0; font-size: 0.9rem; }
+    .form-group small { display: block; color: #64748b; margin-top: 4px; font-size: 0.78rem; }
 
-    .btn { width: 100%; padding: 10px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-    .btn-excel { background: #16a34a; width: auto; padding: 8px 16px; margin-left: auto; }
+    .photo-preview { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .photo-preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 2px solid #cbd5e1; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+    .btn { width: 100%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; min-height: 44px; }
+    .btn-excel { background: #16a34a; width: auto; padding: 10px 16px; }
+
+    .table-scroll { width: 100%; overflow-x: auto; }
+    table { width: 100%; min-width: 480px; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.88rem; white-space: nowrap; }
     th { background: #f8fafc; color: #475569; }
 
-    .action-btn { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+    .action-btn { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; min-height: 36px; }
     .btn-edit { background: #f59e0b; color: white; }
     .btn-delete { background: #ef4444; color: white; }
 
     .badge-late { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 8px; border-radius: 4px; }
     .badge-ontime { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 8px; border-radius: 4px; }
 
-    .filter-bar { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; }
-    .filter-bar input[type="date"] { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; }
+    .filter-bar input[type="date"] { padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; }
+    .filter-bar button { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; cursor: pointer; background: white; min-height: 40px; }
+
+    .card-header-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px; }
   </style>
 
+  <!-- Firebase (umumiy onlayn baza — qaysi qurilmadan ro'yxatdan o'tkazilsa,
+       barcha qurilmalarda darhol ko'rinadi) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-  <!-- LOGIN OYNASI -->
   <div id="login-modal" class="login-overlay">
     <div class="login-box">
       <h2>Панель директора</h2>
-      <input type="text" id="login-user" placeholder="Логин">
-      <input type="password" id="login-pass" placeholder="Пароль">
+      <input type="text" id="login-user" placeholder="Логин" autocomplete="username">
+      <input type="password" id="login-pass" placeholder="Пароль" autocomplete="current-password">
       <button onclick="checkAuth()">Войти</button>
       <p id="login-err" style="color:red; font-size:0.8rem; margin-top:10px; display:none;">Неверный логин или пароль!</p>
     </div>
   </div>
 
-  <!-- ADMIN TIZIMI -->
   <div id="admin-app" class="admin-container">
     <header>
       <h1>Панель директора — Учителя и Отчеты</h1>
-      <button onclick="logout()" style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;">Выйти</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span id="sync-status">🟢 Онлайн</span>
+        <button onclick="logout()" style="padding:8px 14px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer; min-height:40px;">Выйти</button>
+      </div>
     </header>
 
     <div class="grid-container">
@@ -82,65 +104,57 @@
               <input type="text" id="subject" required placeholder="Например: Математика">
             </div>
             <div class="form-group">
-              <label>Фотография лица (Face ID)</label>
-              <input type="file" id="photo" accept="image/*">
+              <label>Фотографии лица (Face ID)</label>
+              <input type="file" id="photo" accept="image/*" multiple>
+              <small>Выберите 2-3 фото (разное освещение/ракурс) — так система будет узнавать увереннее, даже в другой одежде.</small>
+              <div id="photo-preview" class="photo-preview"></div>
             </div>
-            <button type="submit" class="btn">Сохранить</button>
+            <button type="submit" class="btn" id="submit-btn">Сохранить</button>
           </form>
         </div>
 
         <div class="card">
-          <h2>Зарегистрированные учителя</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>ФИО</th>
-                <th>Предмет</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="teachers-table-body"></tbody>
-          </table>
+          <h2>Зарегистрированные учителя (<span id="teacher-count">0</span>)</h2>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ФИО</th><th>Предмет</th><th>Фото</th><th>Действия</th></tr></thead>
+              <tbody id="teachers-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <div>
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2>Отчет посещаемости</h2>
+          <div class="card-header-row">
+            <h2 style="margin:0; border:none; padding:0;">Отчет посещаемости</h2>
             <button class="btn btn-excel" onclick="exportToExcel()">📥 Скачать Excel</button>
           </div>
 
           <div class="filter-bar">
-            <label><b>Выберите дату (Число):</b></label>
+            <label><b>Дата:</b></label>
             <input type="date" id="date-picker" onchange="renderReports()">
-            <button onclick="resetDateFilter()" style="padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">Показать все</button>
+            <button onclick="resetDateFilter()">Показать все</button>
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>ФИО Учителя</th>
-                <th>Предмет</th>
-                <th>Дата</th>
-                <th>Время прихода</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody id="reports-table-body"></tbody>
-          </table>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>№</th><th>ФИО Учителя</th><th>Предмет</th><th>Дата</th><th>Время прихода</th><th>Статус</th></tr>
+              </thead>
+              <tbody id="reports-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // Login check (Login: admin, Parol: 12345)
     function checkAuth() {
       const u = document.getElementById('login-user').value;
       const p = document.getElementById('login-pass').value;
-      if(u === 'admin' && p === '12345') {
+      if (u === 'admin' && p === '12345') {
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('admin-app').style.display = 'block';
         initAdmin();
@@ -149,67 +163,133 @@
       }
     }
 
-    function logout() {
-      location.reload();
-    }
+    function logout() { location.reload(); }
 
     let teachers = [];
     let logs = [];
+    let pendingPhotos = []; // joriy formadagi tanlangan rasm(lar), base64
+
+    function setSyncStatus(online) {
+      const el = document.getElementById('sync-status');
+      el.classList.toggle('offline', !online);
+      el.innerText = online ? '🟢 Онлайн' : '🔴 Нет связи';
+    }
 
     function initAdmin() {
-      teachers = JSON.parse(localStorage.getItem('registered_teachers') || '[]');
-      logs = JSON.parse(localStorage.getItem('attendance_logs') || '[]');
-      
-      // Bugungi sanani kalendarga qo'yish
+      if (!firebaseReady) {
+        setSyncStatus(false);
+        alert('Firebase не настроен — см. комментарии в файле firebase-config.js. Пока данные будут только локальными.');
+        teachers = JSON.parse(localStorage.getItem('registered_teachers') || '[]');
+        logs = JSON.parse(localStorage.getItem('attendance_logs') || '[]');
+        renderTeachers(); renderReports();
+        document.getElementById('date-picker').valueAsDate = new Date();
+        return;
+      }
+
+      // Real vaqtda tinglash: boshqa qurilmadan qo'shilgan/o'chirilgan
+      // o'qituvchi yoki yangi davomat shu zahoti shu ekranda ham ko'rinadi.
+      db.collection(TEACHERS_COLLECTION).onSnapshot(snap => {
+        teachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        localStorage.setItem('registered_teachers', JSON.stringify(teachers));
+        renderTeachers();
+        renderReports();
+        setSyncStatus(true);
+      }, err => { console.error(err); setSyncStatus(false); });
+
+      db.collection(LOGS_COLLECTION).onSnapshot(snap => {
+        logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderReports();
+        setSyncStatus(true);
+      }, err => { console.error(err); setSyncStatus(false); });
+
       document.getElementById('date-picker').valueAsDate = new Date();
-      
-      renderTeachers();
-      renderReports();
     }
+
+    const photoInput = document.getElementById('photo');
+    photoInput.addEventListener('change', async () => {
+      pendingPhotos = [];
+      const preview = document.getElementById('photo-preview');
+      preview.innerHTML = '';
+      const files = Array.from(photoInput.files).slice(0, 3);
+      for (const file of files) {
+        const b64 = await toBase64(file);
+        pendingPhotos.push(b64);
+        const img = document.createElement('img');
+        img.src = b64;
+        preview.appendChild(img);
+      }
+    });
 
     const teacherForm = document.getElementById('teacher-form');
     teacherForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const id = document.getElementById('teacher-id').value;
-      const fullname = document.getElementById('fullname').value.trim();
-      const subject = document.getElementById('subject').value.trim();
-      const photoFile = document.getElementById('photo').files[0];
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Сохранение...';
 
-      let photoBase64 = "";
-      if (photoFile) {
-        photoBase64 = await toBase64(photoFile);
-      }
+      try {
+        const id = document.getElementById('teacher-id').value;
+        const fullname = document.getElementById('fullname').value.trim();
+        const subject = document.getElementById('subject').value.trim();
 
-      if (id) {
-        const idx = teachers.findIndex(t => t.id === id);
-        if (idx !== -1) {
-          teachers[idx].fullname = fullname;
-          teachers[idx].subject = subject;
-          if (photoBase64) teachers[idx].photo = photoBase64;
-        }
-      } else {
-        if(!photoBase64) {
-          alert("Пожалуйста, загрузите фотографию лица!");
+        if (!fullname || !subject) {
+          alert('Заполните ФИО и предмет.');
           return;
         }
-        teachers.push({ id: Date.now().toString(), fullname, subject, photo: photoBase64 });
-      }
 
-      localStorage.setItem('registered_teachers', JSON.stringify(teachers));
-      teacherForm.reset();
-      document.getElementById('teacher-id').value = '';
-      renderTeachers();
-      alert("Данные успешно сохранены!");
+        if (id) {
+          const updateData = { fullname, subject };
+          if (pendingPhotos.length) updateData.photos = pendingPhotos;
+          if (firebaseReady) {
+            await db.collection(TEACHERS_COLLECTION).doc(id).update(updateData);
+          } else {
+            const idx = teachers.findIndex(t => t.id === id);
+            if (idx !== -1) Object.assign(teachers[idx], updateData);
+            localStorage.setItem('registered_teachers', JSON.stringify(teachers));
+            renderTeachers();
+          }
+        } else {
+          if (!pendingPhotos.length) {
+            alert("Пожалуйста, загрузите хотя бы одну фотографию лица!");
+            return;
+          }
+          const newTeacher = { fullname, subject, photos: pendingPhotos };
+          if (firebaseReady) {
+            await db.collection(TEACHERS_COLLECTION).add(newTeacher);
+          } else {
+            newTeacher.id = Date.now().toString();
+            teachers.push(newTeacher);
+            localStorage.setItem('registered_teachers', JSON.stringify(teachers));
+            renderTeachers();
+          }
+        }
+
+        teacherForm.reset();
+        document.getElementById('teacher-id').value = '';
+        document.getElementById('photo-preview').innerHTML = '';
+        pendingPhotos = [];
+        alert("Данные успешно сохранены!");
+      } catch (err) {
+        console.error(err);
+        alert("Ошибка сохранения. Проверьте интернет-соединение.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Сохранить';
+      }
     });
 
     function renderTeachers() {
+      document.getElementById('teacher-count').innerText = teachers.length;
       const tbody = document.getElementById('teachers-table-body');
       tbody.innerHTML = '';
       teachers.forEach(t => {
+        const photoList = Array.isArray(t.photos) ? t.photos : (t.photo ? [t.photo] : []);
+        const thumb = photoList[0] ? `<img src="${photoList[0]}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">` : '—';
         tbody.innerHTML += `
           <tr>
-            <td><b>${t.fullname}</b></td>
-            <td>${t.subject}</td>
+            <td><b>${escapeHtml(t.fullname)}</b></td>
+            <td>${escapeHtml(t.subject)}</td>
+            <td>${thumb} ${photoList.length > 1 ? `<span style="font-size:0.75rem;color:#64748b;">+${photoList.length - 1}</span>` : ''}</td>
             <td>
               <button class="action-btn btn-edit" onclick="editTeacher('${t.id}')">✏️</button>
               <button class="action-btn btn-delete" onclick="deleteTeacher('${t.id}')">🗑️</button>
@@ -219,35 +299,42 @@
       });
     }
 
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.innerText = str == null ? '' : String(str);
+      return div.innerHTML;
+    }
+
     function editTeacher(id) {
       const t = teachers.find(item => item.id === id);
       if (t) {
         document.getElementById('teacher-id').value = t.id;
         document.getElementById('fullname').value = t.fullname;
         document.getElementById('subject').value = t.subject;
+        document.getElementById('photo-preview').innerHTML = '';
+        pendingPhotos = [];
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
 
-    function deleteTeacher(id) {
-      if (confirm("Удалить учителя из системы?")) {
+    async function deleteTeacher(id) {
+      if (!confirm("Удалить учителя из системы?")) return;
+      if (firebaseReady) {
+        await db.collection(TEACHERS_COLLECTION).doc(id).delete().catch(err => alert('Ошибка удаления: ' + err.message));
+      } else {
         teachers = teachers.filter(t => t.id !== id);
         localStorage.setItem('registered_teachers', JSON.stringify(teachers));
         renderTeachers();
       }
     }
 
-    // Otchyotni saralash va chiqarish (Eng birinchi kelganlar yuqorida)
     function renderReports() {
       const selectedDate = document.getElementById('date-picker').value;
       const tbody = document.getElementById('reports-table-body');
       tbody.innerHTML = '';
 
-      let filteredLogs = logs;
-      if (selectedDate) {
-        filteredLogs = logs.filter(l => l.date === selectedDate);
-      }
-
-      // Vaqt bo'yicha eng birinchi kelganlar tartibida saralash (ASC)
+      let filteredLogs = logs.slice();
+      if (selectedDate) filteredLogs = filteredLogs.filter(l => l.date === selectedDate);
       filteredLogs.sort((a, b) => a.time.localeCompare(b.time));
 
       filteredLogs.forEach((log, index) => {
@@ -255,15 +342,11 @@
         tbody.innerHTML += `
           <tr>
             <td>${index + 1}</td>
-            <td><b>${log.name}</b></td>
-            <td>${teacher.subject}</td>
-            <td>${log.date}</td>
-            <td><b>${log.time}</b></td>
-            <td>
-              <span class="${log.isLate ? 'badge-late' : 'badge-ontime'}">
-                ${log.isLate ? 'Опоздал(а)' : 'Вовремя'}
-              </span>
-            </td>
+            <td><b>${escapeHtml(log.name)}</b></td>
+            <td>${escapeHtml(teacher.subject)}</td>
+            <td>${escapeHtml(log.date)}</td>
+            <td><b>${escapeHtml(log.time)}</b></td>
+            <td><span class="${log.isLate ? 'badge-late' : 'badge-ontime'}">${log.isLate ? 'Опоздал(а)' : 'Вовремя'}</span></td>
           </tr>
         `;
       });
@@ -276,21 +359,15 @@
 
     function exportToExcel() {
       const selectedDate = document.getElementById('date-picker').value;
-      let filteredLogs = logs;
-      if (selectedDate) {
-        filteredLogs = logs.filter(l => l.date === selectedDate);
-      }
+      let filteredLogs = logs.slice();
+      if (selectedDate) filteredLogs = filteredLogs.filter(l => l.date === selectedDate);
       filteredLogs.sort((a, b) => a.time.localeCompare(b.time));
 
       const data = filteredLogs.map((l, i) => {
         const teacher = teachers.find(t => t.fullname === l.name) || { subject: '-' };
         return {
-          "№": i + 1,
-          "ФИО": l.name,
-          "Предмет": teacher.subject,
-          "Дата": l.date,
-          "Время": l.time,
-          "Статус": l.isLate ? "Опоздал(а)" : "Вовремя"
+          "№": i + 1, "ФИО": l.name, "Предмет": teacher.subject,
+          "Дата": l.date, "Время": l.time, "Статус": l.isLate ? "Опоздал(а)" : "Вовремя"
         };
       });
 
