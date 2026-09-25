@@ -1,60 +1,62 @@
-/* =========================================================================
-   FIREBASE SOZLAMALARI / НАСТРОЙКИ FIREBASE
-   =========================================================================
-   Бу файл барча қурилмалар (телефон, планшет, айпад, ноутбук, компьютер)
-   БИР ХИЛ маълумотни кўриши учун керак. localStorage фақат битта браузерда
-   ишлайди — шунинг учун умумий онлайн база (Firebase Firestore) ишлатилади.
-
-   ЎРНАТИШ (бир марта, 5 дақиқа, БЕПУЛ):
-   1) https://console.firebase.google.com очинг, Google аккаунт билан киринг
-   2) "Add project" — лойиҳага ном беринг (масалан: maktab-faceid) — Continue
-   3) Google Analytics сўраса — ўчиринг (Enable бўлмаса ҳам бўлади) — Create project
-   4) Чап менюдан "Build" -> "Firestore Database" -> "Create database"
-      - Location: eu-west (ёки яқин минтақа) -> Next
-      - "Start in test mode" ни танланг -> Enable
-   5) Чап менюдаги ⚙️ (Project settings) -> "Your apps" -> "</>" (Web) белгисини босинг
-      - Ном беринг (масалан: maktab-web) -> Register app
-      - Кўринган firebaseConfig обектини қуйидаги firebaseConfig ўрнига қўйинг
-   6) Firestore -> Rules бўлимига ўтиб, вақтинча шуни қўйинг (ФАҚАТ мактаб
-      ички тизими учун, ошкора сайт эмас):
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            match /{document=**} {
-              allow read, write: if true;
-            }
-          }
-        }
-      -> Publish
-
-   Шундан кейин пастдаги firebaseConfig'ни ўзингизникига алмаштиринг ва
-   файлни сақланг — index.html ва admin.html иккаласи ҳам шу файлни
-   ишлатади, шунинг учун бир жойда созлаш кифоя.
-   ========================================================================= */
-
+// ====== FIREBASE KONFIGURATSIYASI (umumiy fayl, ikkala sahifa ham shundan foydalanadi) ======
 const firebaseConfig = {
-  apiKey: "ВАШ_API_KEY",
-  authDomain: "ВАШ_PROJECT.firebaseapp.com",
-  projectId: "ВАШ_PROJECT_ID",
-  storageBucket: "ВАШ_PROJECT.appspot.com",
-  messagingSenderId: "ВАШ_SENDER_ID",
-  appId: "ВАШ_APP_ID"
+  apiKey: "AIzaSyDE7AeBnjWJJaLrQNTkoi12NxrTzZ194xU",
+  authDomain: "face-id-8fa3e.firebaseapp.com",
+  projectId: "face-id-8fa3e",
+  storageBucket: "face-id-8fa3e.firebasestorage.app",
+  messagingSenderId: "177369780852",
+  appId: "1:177369780852:web:4fc0905882a3a52a0ef721"
 };
 
-let db = null;
-let firebaseReady = false;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-  // Юкланиш тезроқ бўлиши ва интернет вақтинча узилса ҳам ишлаши учун
-  // маҳаллий кэшни ёқамиз (қурилма ичида офлайн заҳира сифатида).
-  db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-  firebaseReady = true;
-} catch (e) {
-  console.error("Firebase ulanish xatosi:", e);
-  firebaseReady = false;
+// XSS'dan himoya uchun: matnni HTML sifatida emas, oddiy matn sifatida chiqarish
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
 }
 
-const TEACHERS_COLLECTION = "teachers";
-const LOGS_COLLECTION = "attendance_logs";
+// Rasmni kichraytirib, siqib beradi (Firestore hujjat hajmi va tezlik uchun)
+function resizeImage(file, maxSize = 480, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Файлни ўқиб бўлмади'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Расмни очиб бўлмади'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round(height * (maxSize / width));
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round(width * (maxSize / height));
+          height = maxSize;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Mahalliy (local) sana — UTC emas, qurilmaning o'z vaqt zonasi bo'yicha (kechasi sana surilib ketmasligi uchun)
+function getLocalDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getLocalTimeStr(d = new Date()) {
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${min}`;
+}
