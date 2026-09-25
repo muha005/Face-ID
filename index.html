@@ -2,32 +2,68 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Face ID - Rajab Xo'jamov nomidagi o'rta maktabi</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #0f172a; color: #fff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
-    
-    header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { font-size: 1.3rem; color: #38bdf8; }
-    
-    .lang-btns button { background: #334155; color: white; border: none; padding: 8px 14px; cursor: pointer; border-radius: 6px; font-weight: bold; font-size: 0.9rem; }
+    :root {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    html, body { height: 100%; }
+    body {
+      background-color: #0f172a; color: #fff;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100%; padding: 16px;
+    }
+
+    header {
+      width: 100%; max-width: 700px;
+      display: flex; flex-wrap: wrap; gap: 10px;
+      justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    h1 { font-size: clamp(1rem, 3.5vw, 1.3rem); color: #38bdf8; }
+
+    .lang-btns button { background: #334155; color: white; border: none; padding: 10px 14px; cursor: pointer; border-radius: 6px; font-weight: bold; font-size: 0.9rem; min-height: 40px; }
     .lang-btns button.active { background: #0284c7; }
 
-    .camera-container { position: relative; width: 100%; max-width: 640px; height: 480px; background: #1e293b; border-radius: 16px; overflow: hidden; border: 3px solid #334155; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    canvas { position: absolute; top: 0; left: 0; }
+    #offline-banner { display:none; width:100%; max-width:700px; background:#7f1d1d; color:#fecaca; padding:8px 12px; border-radius:8px; margin-bottom:12px; font-size:0.85rem; text-align:center; }
 
-    .result-card { margin-top: 20px; width: 100%; max-width: 640px; background: #1e293b; padding: 20px; border-radius: 16px; border-left: 6px solid #64748b; transition: all 0.2s ease; text-align: center; }
+    .camera-container {
+      position: relative; width: 100%; max-width: 640px;
+      aspect-ratio: 4 / 3;
+      background: #1e293b; border-radius: 16px; overflow: hidden;
+      border: 3px solid #334155; display: flex; justify-content: center; align-items: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+    .result-card {
+      margin-top: 16px; width: 100%; max-width: 640px;
+      background: #1e293b; padding: 18px; border-radius: 16px;
+      border-left: 6px solid #64748b; transition: all 0.2s ease; text-align: center;
+      margin-bottom: env(safe-area-inset-bottom, 0px);
+    }
     .result-card.success { border-left-color: #22c55e; background: #064e3b; }
     .result-card.late { border-left-color: #ef4444; background: #7f1d1d; }
     .result-card.unknown { border-left-color: #f59e0b; background: #451a03; }
 
-    .check-icon { font-size: 3.5rem; display: none; line-height: 1; margin-bottom: 8px; }
-    .status-text { font-size: 1.3rem; font-weight: bold; margin-bottom: 8px; }
-    .teacher-info { font-size: 1.1rem; color: #e2e8f0; }
+    .check-icon { font-size: clamp(2.2rem, 8vw, 3.5rem); display: none; line-height: 1; margin-bottom: 8px; }
+    .status-text { font-size: clamp(1rem, 4vw, 1.3rem); font-weight: bold; margin-bottom: 8px; }
+    .teacher-info { font-size: clamp(0.9rem, 3.5vw, 1.1rem); color: #e2e8f0; word-break: break-word; }
     .time-badge { display: inline-block; margin-top: 10px; padding: 6px 14px; background: rgba(255,255,255,0.2); border-radius: 20px; font-size: 1rem; font-weight: bold; }
+
+    @media (max-width: 420px) {
+      header { justify-content: center; text-align: center; }
+    }
   </style>
+
+  <!-- Firebase (umumiy onlayn baza — barcha qurilmalar bitta ma'lumotni ko'radi) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
 
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <script defer src="script.js"></script>
@@ -42,8 +78,10 @@
     </div>
   </header>
 
+  <div id="offline-banner">⚠️ Нет связи с сервером — проверьте интернет</div>
+
   <div class="camera-container">
-    <video id="video" autoplay muted></video>
+    <video id="video" autoplay muted playsinline webkit-playsinline></video>
   </div>
 
   <div id="result-card" class="result-card">
